@@ -1,0 +1,19 @@
+# dépendances
+/node_modules
+
+# build Next.js
+/.next
+/out
+*.tsbuildinfo
+
+# secrets / environnement — NE JAMAIS committer
+.env
+.env*.local
+
+# gros fichier source (non versionné, trop lourd pour GitHub)
+/public/*.docx
+
+# divers
+.DS_Store
+*.pem
+npm-debug.log*
