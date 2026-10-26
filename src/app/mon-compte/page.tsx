@@ -22,8 +22,8 @@ export default function MonComptePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
-    if (nouveau.length < 6) {
-      setMessage({ type: "error", text: "Le nouveau mot de passe doit faire au moins 6 caractères." });
+    if (nouveau.length < 8) {
+      setMessage({ type: "error", text: "Le nouveau mot de passe doit faire au moins 8 caractères." });
       return;
     }
     if (nouveau !== confirm) {

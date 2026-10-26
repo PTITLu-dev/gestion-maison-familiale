@@ -12,11 +12,14 @@ export async function POST(req: Request) {
     p_actionnaire: identifiant,
     p_motdepasse: motdepasse,
   });
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ ok: false, error: "Erreur serveur, réessaie plus tard." }, { status: 500 });
 
   const token = data as string | null;
   if (!token) {
-    return NextResponse.json({ ok: false, error: "Identifiant ou mot de passe incorrect." }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "Identifiant ou mot de passe incorrect (compte bloqué 15 min après 5 essais)." },
+      { status: 401 }
+    );
   }
 
   (await cookies()).set(COOKIE, token, {

@@ -1,6 +1,7 @@
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 import AddFournisseurForm from "@/components/AddFournisseurForm";
 import FournisseursTable from "@/components/FournisseursTable";
+import { exigerActionnaire } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ type Fournisseur = {
 };
 
 export default async function FournisseursPage() {
+  await exigerActionnaire();
   let rows: Fournisseur[] = [];
   let loadError: string | null = null;
 

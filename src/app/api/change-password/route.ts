@@ -13,13 +13,13 @@ export async function POST(req: Request) {
     p_ancien: ancien,
     p_nouveau: nouveau,
   });
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ ok: false, error: "Erreur serveur, réessaie plus tard." }, { status: 500 });
 
   const code = data as string;
   if (code === "ok") return NextResponse.json({ ok: true });
   const messages: Record<string, string> = {
     session: "Session expirée, reconnecte-toi.",
-    court: "Le nouveau mot de passe doit faire au moins 6 caractères.",
+    court: "Le nouveau mot de passe doit faire au moins 8 caractères.",
     mauvais: "L'ancien mot de passe est incorrect.",
   };
   return NextResponse.json({ ok: false, error: messages[code] ?? "Erreur." }, { status: 400 });

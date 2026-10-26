@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 const field =
   "w-full rounded-lg border border-sand bg-cream px-3 py-2 text-sm focus:border-olive focus:outline-none";
@@ -13,13 +12,6 @@ export default function LoginPage() {
   const [motdepasse, setMotdepasse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [actionnaires, setActionnaires] = useState<string[]>([]);
-
-  useEffect(() => {
-    supabase.rpc("liste_actionnaires").then(({ data }) => {
-      if (data) setActionnaires(data as string[]);
-    });
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,20 +43,19 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-sand bg-white p-5 shadow-sm">
         <label className="block">
-          <span className="mb-1 block text-sm text-muted">Actionnaire</span>
-          <select className={field} value={identifiant} onChange={(e) => setIdentifiant(e.target.value)}>
-            <option value="">— choisir —</option>
-            {actionnaires.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
+          <span className="mb-1 block text-sm text-muted">Identifiant (Prénom NOM)</span>
+          <input
+            type="text"
+            autoComplete="username"
+            className={field}
+            value={identifiant}
+            onChange={(e) => setIdentifiant(e.target.value)}
+          />
         </label>
 
         <label className="block">
           <span className="mb-1 block text-sm text-muted">Mot de passe</span>
-          <input type="password" className={field} value={motdepasse} onChange={(e) => setMotdepasse(e.target.value)} />
+          <input type="password" autoComplete="current-password" className={field} value={motdepasse} onChange={(e) => setMotdepasse(e.target.value)} />
         </label>
 
         {error && (

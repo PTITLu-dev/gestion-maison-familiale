@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { ajouterPostit } from "@/app/actions";
 import { COULEURS_POSTIT } from "@/lib/postits";
 
 const field =
@@ -24,10 +24,10 @@ export default function AddPostitForm({ user }: { user: string }) {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("postits").insert({ auteur: nom.trim(), compte: user, texte: texte.trim(), couleur });
+    const res = await ajouterPostit({ nom, texte, couleur });
     setLoading(false);
-    if (error) {
-      setMessage({ type: "error", text: "Erreur : " + error.message });
+    if (!res.ok) {
+      setMessage({ type: "error", text: res.error });
       return;
     }
     setMessage({ type: "success", text: "Post-it ajouté ✓" });

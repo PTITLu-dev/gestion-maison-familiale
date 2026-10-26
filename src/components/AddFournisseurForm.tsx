@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { ajouterFournisseur } from "@/app/actions";
 
 const field =
   "w-full rounded-lg border border-sand bg-cream px-3 py-2 text-sm focus:border-olive focus:outline-none";
@@ -26,17 +26,10 @@ export default function AddFournisseurForm() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("fournisseurs").insert({
-      objet: objet.trim(),
-      intervenant: intervenant || null,
-      adresse: adresse || null,
-      email: email || null,
-      telephone: telephone || null,
-      date_intervention: date || null,
-    });
+    const res = await ajouterFournisseur({ objet, intervenant, adresse, email, telephone, date_intervention: date });
     setLoading(false);
-    if (error) {
-      setMessage({ type: "error", text: "Erreur : " + error.message });
+    if (!res.ok) {
+      setMessage({ type: "error", text: res.error });
       return;
     }
     setMessage({ type: "success", text: "Fournisseur ajouté ✓" });

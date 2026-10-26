@@ -1,7 +1,7 @@
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 import { classePostit, type Postit } from "@/lib/postits";
 import AddPostitForm from "@/components/AddPostitForm";
-import { getActionnaire } from "@/lib/session";
+import { exigerActionnaire } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ function formatDate(iso: string) {
 }
 
 export default async function PostitsPage() {
-  const user = await getActionnaire();
+  const user = await exigerActionnaire();
   let postits: Postit[] = [];
   let loadError: string | null = null;
 
@@ -42,7 +42,7 @@ export default async function PostitsPage() {
         </div>
       )}
 
-      <AddPostitForm user={user ?? ""} />
+      <AddPostitForm user={user} />
 
       {postits.length === 0 ? (
         <p className="rounded-xl border border-sand bg-white p-4 text-muted">

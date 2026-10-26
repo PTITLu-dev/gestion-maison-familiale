@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
-import { getActionnaire } from "@/lib/session";
+import { exigerActionnaire } from "@/lib/session";
 import { jourSuivant, type Evenement } from "@/lib/evenements";
 import CalendrierPlanning, { type Evt } from "@/components/CalendrierPlanning";
 import AddEventForm from "@/components/AddEventForm";
@@ -17,7 +17,7 @@ type Row = {
 };
 
 export default async function PlanningPage() {
-  const user = await getActionnaire();
+  await exigerActionnaire();
   let events: Evt[] = [];
   let loadError: string | null = null;
 
@@ -85,7 +85,7 @@ export default async function PlanningPage() {
           ➕ Ajouter un rendez-vous ou un événement
         </summary>
         <div className="mt-4">
-          <AddEventForm user={user ?? ""} />
+          <AddEventForm />
         </div>
       </details>
     </div>

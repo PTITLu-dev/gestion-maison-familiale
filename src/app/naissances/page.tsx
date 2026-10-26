@@ -3,6 +3,7 @@ import { MOIS, prochainsAnniversaires, quand, familleStyle, type Naissance } fro
 import type { Arbre } from "@/lib/arbre";
 import AddBirthForm from "@/components/AddBirthForm";
 import ArbreGenealogique from "@/components/ArbreGenealogique";
+import { exigerActionnaire } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ function Pastille({ famille, branche }: { famille?: string | null; branche?: num
 }
 
 export default async function NaissancesPage() {
+  await exigerActionnaire();
   let list: Naissance[] = [];
   let arbre: Arbre | null = null;
   let loadError: string | null = null;

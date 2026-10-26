@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { chambresPrises, reserver } from "@/app/actions";
 import { CHAMBRES } from "@/lib/chambres";
 import PlanParadou from "@/components/PlanParadou";
 
@@ -47,13 +47,8 @@ export default function BookingSection({ user }: { user: string }) {
         return;
       }
 
-      const { data } = await supabase
-        .from("reservations")
-        .select("chambre_id")
-        .lt("arrivee", depart)
-        .gt("depart", arrivee);
+      const ids = await chambresPrises(arrivee, depart);
       if (annule) return;
-      const ids = Array.from(new Set(((data ?? []) as { chambre_id: number }[]).map((r) => r.chambre_id)));
       setTakenIds(ids);
 
       setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
@@ -99,45 +94,15 @@ export default function BookingSection({ user }: { user: string }) {
     }
 
     setLoading(true);
-
-    const { data: conflictData } = await supabase
-      .from("reservations")
-      .select("chambres(nom)")
-      .in("chambre_id", selectedIds)
-      .lt("arrivee", depart)
-      .gt("depart", arrivee);
-    const conflicts = (conflictData ?? []) as unknown as { chambres: { nom: string } | null }[];
-    if (conflicts.length > 0) {
-      const noms = Array.from(new Set(conflicts.map((c) => c.chambres?.nom).filter(Boolean)));
-      setLoading(false);
-      setMessage({ type: "error", text: `Déjà réservé sur ces dates : ${noms.join(", ")}.` });
-      return;
-    }
-
-    const rows = selectedIds.map((id) => ({
-      chambre_id: id,
-      famille: user,
-      occupant: occupant || null,
-      arrivee,
-      depart,
-      personnes: personnes ? Number(personnes) : null,
-      note: note || null,
-    }));
-    const { error } = await supabase.from("reservations").insert(rows);
+    const res = await reserver({ chambreIds: selectedIds, arrivee, depart, occupant, personnes, note });
     setLoading(false);
 
-    if (error) {
-      setMessage({
-        type: "error",
-        text:
-          error.code === "23P01"
-            ? "Une pièce vient d'être prise sur ces dates. Réessaie."
-            : "Erreur : " + error.message,
-      });
+    if (!res.ok) {
+      setMessage({ type: "error", text: res.error });
       return;
     }
 
-    setMessage({ type: "success", text: `Réservation enregistrée : ${rows.length} pièce(s), ${nuits} nuit(s) ✓` });
+    setMessage({ type: "success", text: `Réservation enregistrée : ${selectedIds.length} pièce(s), ${nuits} nuit(s) ✓` });
     setSelectedIds([]);
     setOccupant("");
     setPersonnes("");

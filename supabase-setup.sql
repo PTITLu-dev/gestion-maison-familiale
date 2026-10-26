@@ -1,5 +1,7 @@
 -- ============================================================
 --  La Maison — Configuration Supabase (schéma vierge)
+--  Sécurité : RLS activé partout, aucune policy → la clé publique (anon) n'a accès à rien.
+--  Toutes les lectures/écritures passent par le serveur Next.js (clé service_role).
 --  Application de gestion d'une maison familiale.
 --  À exécuter dans Supabase : SQL Editor -> New query -> coller -> Run.
 --  Aucune donnée personnelle : à toi de créer les comptes et le contenu.
@@ -20,8 +22,6 @@ create table if not exists chambres (
   ordre     int not null default 0
 );
 alter table chambres enable row level security;
-drop policy if exists "lecture chambres" on chambres;
-create policy "lecture chambres" on chambres for select using (true);
 
 -- Les 11 pièces (l'ordre fixe les id 1..11, utilisés par le front)
 insert into chambres (nom, etage, couchage, capacite, appoint, ordre) values
@@ -56,10 +56,6 @@ create table if not exists reservations (
   )
 );
 alter table reservations enable row level security;
-drop policy if exists "lecture reservations" on reservations;
-create policy "lecture reservations" on reservations for select using (true);
-drop policy if exists "ajout reservations" on reservations;
-create policy "ajout reservations" on reservations for insert with check (true);
 
 -- ---------- Naissances / anniversaires ----------
 create table if not exists naissances (
@@ -73,10 +69,6 @@ create table if not exists naissances (
   created_at timestamptz not null default now()
 );
 alter table naissances enable row level security;
-drop policy if exists "lecture naissances" on naissances;
-create policy "lecture naissances" on naissances for select using (true);
-drop policy if exists "ajout naissances" on naissances;
-create policy "ajout naissances" on naissances for insert with check (true);
 
 -- ---------- Rendez-vous / événements ----------
 create table if not exists evenements (
@@ -91,10 +83,6 @@ create table if not exists evenements (
   created_at  timestamptz not null default now()
 );
 alter table evenements enable row level security;
-drop policy if exists "lecture evenements" on evenements;
-create policy "lecture evenements" on evenements for select using (true);
-drop policy if exists "ajout evenements" on evenements;
-create policy "ajout evenements" on evenements for insert with check (true);
 
 -- ---------- Mur de post-its ----------
 create table if not exists postits (
@@ -107,10 +95,6 @@ create table if not exists postits (
   created_at timestamptz not null default now()
 );
 alter table postits enable row level security;
-drop policy if exists "lecture postits" on postits;
-create policy "lecture postits" on postits for select using (true);
-drop policy if exists "ajout postits" on postits;
-create policy "ajout postits" on postits for insert with check (true);
 
 -- ---------- Fournisseurs ----------
 create table if not exists fournisseurs (
@@ -125,12 +109,6 @@ create table if not exists fournisseurs (
   created_at        timestamptz not null default now()
 );
 alter table fournisseurs enable row level security;
-drop policy if exists "lecture fournisseurs" on fournisseurs;
-create policy "lecture fournisseurs" on fournisseurs for select using (true);
-drop policy if exists "ajout fournisseurs" on fournisseurs;
-create policy "ajout fournisseurs" on fournisseurs for insert with check (true);
-drop policy if exists "modif fournisseurs" on fournisseurs;
-create policy "modif fournisseurs" on fournisseurs for update using (true) with check (true);
 
 -- ---------- Arbre généalogique (JSON) ----------
 create table if not exists arbre (
@@ -138,77 +116,117 @@ create table if not exists arbre (
   data jsonb not null
 );
 alter table arbre enable row level security;
-drop policy if exists "lecture arbre" on arbre;
-create policy "lecture arbre" on arbre for select using (true);
 -- Insère ton arbre :  insert into arbre (cle, data) values ('paradou', '{...}'::jsonb);
 
--- ---------- Comptes & connexion ----------
+-- ---------- Comptes ----------
 create table if not exists comptes (
   actionnaire       text primary key,
   mot_de_passe_hash text not null,
   session_token     text,
+  session_expire    timestamptz,
+  echecs            int not null default 0,
+  bloque_jusqua     timestamptz,
   doit_changer      boolean not null default true,
   role              text not null default 'actionnaire',
   created_at        timestamptz not null default now()
 );
-alter table comptes enable row level security; -- aucune policy : accès via fonctions uniquement
+alter table comptes enable row level security;
+
+-- ---------- Comptes & connexion ----------
+-- Aucun accès direct depuis le navigateur : seul le serveur Next.js (clé service_role)
+-- appelle ces fonctions. Le jeton de session n'est stocké qu'haché (SHA-256), il expire
+-- au bout de 30 jours, et un compte est bloqué 15 minutes après 5 mots de passe faux.
 
 create or replace function connexion(p_actionnaire text, p_motdepasse text)
 returns text language plpgsql security definer set search_path = public, extensions as $$
-declare tok text;
+declare
+  c   comptes%rowtype;
+  tok text;
 begin
-  if not exists (select 1 from comptes where actionnaire = p_actionnaire
-                 and mot_de_passe_hash = crypt(p_motdepasse, mot_de_passe_hash)) then
+  select * into c from comptes where lower(actionnaire) = lower(btrim(coalesce(p_actionnaire, '')));
+  if not found then
+    perform crypt(coalesce(p_motdepasse, ''), gen_salt('bf'));  -- même coût qu'un vrai essai
     return null;
   end if;
-  tok := encode(gen_random_bytes(24), 'hex');
-  update comptes set session_token = tok where actionnaire = p_actionnaire;
+  if c.bloque_jusqua is not null and c.bloque_jusqua > now() then
+    return null;
+  end if;
+  if c.mot_de_passe_hash <> crypt(coalesce(p_motdepasse, ''), c.mot_de_passe_hash) then
+    update comptes
+       set echecs        = case when echecs + 1 >= 5 then 0 else echecs + 1 end,
+           bloque_jusqua = case when echecs + 1 >= 5 then now() + interval '15 minutes' else bloque_jusqua end
+     where actionnaire = c.actionnaire;
+    return null;
+  end if;
+  tok := encode(gen_random_bytes(32), 'hex');
+  update comptes
+     set session_token  = encode(digest(tok, 'sha256'), 'hex'),
+         session_expire = now() + interval '30 days',
+         echecs         = 0,
+         bloque_jusqua  = null
+   where actionnaire = c.actionnaire;
   return tok;
 end; $$;
 
 create or replace function whoami(p_token text)
-returns text language sql security definer set search_path = public, extensions as $$
-  select actionnaire from comptes where p_token is not null and session_token = p_token;
+returns text language sql stable security definer set search_path = public, extensions as $$
+  select actionnaire from comptes
+   where p_token is not null
+     and session_token = encode(digest(p_token, 'sha256'), 'hex')
+     and session_expire > now();
 $$;
 
 create or replace function mot_de_passe_a_changer(p_token text)
-returns boolean language sql security definer set search_path = public, extensions as $$
-  select doit_changer from comptes where p_token is not null and session_token = p_token;
+returns boolean language sql stable security definer set search_path = public, extensions as $$
+  select doit_changer from comptes
+   where p_token is not null
+     and session_token = encode(digest(p_token, 'sha256'), 'hex')
+     and session_expire > now();
 $$;
 
 create or replace function deconnexion(p_token text)
 returns void language sql security definer set search_path = public, extensions as $$
-  update comptes set session_token = null where session_token = p_token;
+  update comptes set session_token = null, session_expire = null
+   where p_token is not null and session_token = encode(digest(p_token, 'sha256'), 'hex');
 $$;
 
 create or replace function changer_mot_de_passe(p_token text, p_ancien text, p_nouveau text)
 returns text language plpgsql security definer set search_path = public, extensions as $$
 declare who text;
 begin
-  select actionnaire into who from comptes where p_token is not null and session_token = p_token;
+  select whoami(p_token) into who;
   if who is null then return 'session'; end if;
-  if length(coalesce(p_nouveau,'')) < 6 then return 'court'; end if;
+  if length(coalesce(p_nouveau, '')) < 8 then return 'court'; end if;
   if not exists (select 1 from comptes where actionnaire = who
-                 and mot_de_passe_hash = crypt(p_ancien, mot_de_passe_hash)) then
+                 and mot_de_passe_hash = crypt(coalesce(p_ancien, ''), mot_de_passe_hash)) then
     return 'mauvais';
   end if;
-  update comptes set mot_de_passe_hash = crypt(p_nouveau, gen_salt('bf')), doit_changer = false
-  where actionnaire = who;
+  update comptes set mot_de_passe_hash = crypt(p_nouveau, gen_salt('bf', 10)), doit_changer = false
+   where actionnaire = who;
   return 'ok';
 end; $$;
 
-create or replace function liste_actionnaires()
-returns setof text language sql security definer set search_path = public as $$
-  select actionnaire from comptes order by actionnaire;
-$$;
+drop function if exists liste_actionnaires();
 
-grant execute on function connexion(text,text)                 to anon;
-grant execute on function whoami(text)                          to anon;
-grant execute on function mot_de_passe_a_changer(text)          to anon;
-grant execute on function deconnexion(text)                     to anon;
-grant execute on function changer_mot_de_passe(text,text,text)  to anon;
-grant execute on function liste_actionnaires()                  to anon;
+-- ---------- Droits : rien pour anon / authenticated ----------
+-- RLS activé sans aucune policy : la clé publique (anon) ne peut ni lire ni écrire.
+-- Le serveur utilise la clé service_role, qui contourne RLS.
+revoke all on table chambres, reservations, naissances, evenements, postits, fournisseurs, arbre, comptes
+  from anon, authenticated;
+revoke all on sequence chambres_id_seq from anon, authenticated;
+
+revoke execute on function connexion(text, text)                from public, anon, authenticated;
+revoke execute on function whoami(text)                         from public, anon, authenticated;
+revoke execute on function mot_de_passe_a_changer(text)         from public, anon, authenticated;
+revoke execute on function deconnexion(text)                    from public, anon, authenticated;
+revoke execute on function changer_mot_de_passe(text, text, text) from public, anon, authenticated;
+
+grant execute on function connexion(text, text)                to service_role;
+grant execute on function whoami(text)                         to service_role;
+grant execute on function mot_de_passe_a_changer(text)         to service_role;
+grant execute on function deconnexion(text)                    to service_role;
+grant execute on function changer_mot_de_passe(text, text, text) to service_role;
 
 -- Créer un compte (à adapter) — mot de passe haché automatiquement :
 -- insert into comptes (actionnaire, mot_de_passe_hash)
--- values ('Prénom NOM', extensions.crypt('MotDePasseProvisoire', extensions.gen_salt('bf')));
+-- values ('Prénom NOM', extensions.crypt('MotDePasseProvisoire', extensions.gen_salt('bf', 10)));

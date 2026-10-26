@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { supabaseConfigured } from "@/lib/supabase";
-import { getActionnaire } from "@/lib/session";
+import { exigerActionnaire } from "@/lib/session";
 import BookingSection from "@/components/BookingSection";
 
 export default async function ReserverPage() {
-  const user = await getActionnaire();
+  const user = await exigerActionnaire();
   return (
     <div className="space-y-6">
       <div>
@@ -25,7 +25,7 @@ export default async function ReserverPage() {
         </div>
       )}
 
-      <BookingSection user={user ?? ""} />
+      <BookingSection user={user} />
     </div>
   );
 }

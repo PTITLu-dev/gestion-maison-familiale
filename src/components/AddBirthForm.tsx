@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { ajouterNaissance } from "@/app/actions";
 import { MOIS } from "@/lib/anniversaires";
 
 const field =
@@ -27,16 +27,11 @@ export default function AddBirthForm() {
     }
 
     setLoading(true);
-    const { error } = await supabase.from("naissances").insert({
-      nom,
-      jour: Number(jour),
-      mois: Number(mois),
-      annee: annee ? Number(annee) : null,
-    });
+    const res = await ajouterNaissance({ nom, jour, mois, annee });
     setLoading(false);
 
-    if (error) {
-      setMessage({ type: "error", text: "Erreur : " + error.message });
+    if (!res.ok) {
+      setMessage({ type: "error", text: res.error });
       return;
     }
 

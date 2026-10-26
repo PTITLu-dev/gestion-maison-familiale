@@ -4,6 +4,7 @@ import { supabase, supabaseConfigured } from "@/lib/supabase";
 import { MOIS, prochainsAnniversaires, quand, familleStyle, type Naissance } from "@/lib/anniversaires";
 import { classePostit, type Postit } from "@/lib/postits";
 import { TYPE_LABEL, type Evenement } from "@/lib/evenements";
+import { exigerActionnaire } from "@/lib/session";
 
 const reservations = [
   { famille: "Famille Martin", detail: "Maison entière", dates: "28 juin → 5 juil." },
@@ -29,6 +30,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint: stri
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
+  await exigerActionnaire();
   let naissances: Naissance[] = [];
   let postits: Postit[] = [];
   let evenements: Evenement[] = [];

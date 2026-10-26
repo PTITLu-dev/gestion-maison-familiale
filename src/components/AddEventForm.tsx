@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { ajouterEvenement } from "@/app/actions";
 
 const field =
   "w-full rounded-lg border border-sand bg-cream px-3 py-2 text-sm focus:border-olive focus:outline-none";
 
-export default function AddEventForm({ user }: { user: string }) {
+export default function AddEventForm() {
   const router = useRouter();
   const [type, setType] = useState("evenement");
   const [titre, setTitre] = useState("");
@@ -25,17 +25,10 @@ export default function AddEventForm({ user }: { user: string }) {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("evenements").insert({
-      titre: titre.trim(),
-      type,
-      date,
-      heure: heure || null,
-      lieu: lieu || null,
-      auteur: user,
-    });
+    const res = await ajouterEvenement({ titre, type, date, heure, lieu });
     setLoading(false);
-    if (error) {
-      setMessage({ type: "error", text: "Erreur : " + error.message });
+    if (!res.ok) {
+      setMessage({ type: "error", text: res.error });
       return;
     }
     setMessage({ type: "success", text: "Ajouté au calendrier ✓" });

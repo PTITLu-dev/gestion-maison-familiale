@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { modifierFournisseur } from "@/app/actions";
 
 type Fournisseur = {
   id: string;
@@ -51,17 +51,14 @@ export default function FournisseursTable({ rows }: { rows: Fournisseur[] }) {
     if (!draft) return;
     if (!draft.objet.trim()) return;
     setBusy(true);
-    await supabase
-      .from("fournisseurs")
-      .update({
-        objet: draft.objet.trim(),
-        intervenant: draft.intervenant || null,
-        adresse: draft.adresse || null,
-        email: draft.email || null,
-        telephone: draft.telephone || null,
-        date_intervention: draft.date_intervention || null,
-      })
-      .eq("id", draft.id);
+    await modifierFournisseur(draft.id, {
+      objet: draft.objet,
+      intervenant: draft.intervenant,
+      adresse: draft.adresse,
+      email: draft.email,
+      telephone: draft.telephone,
+      date_intervention: draft.date_intervention,
+    });
     setBusy(false);
     setDraft(null);
     router.refresh();
